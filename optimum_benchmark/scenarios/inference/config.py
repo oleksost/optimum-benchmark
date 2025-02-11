@@ -101,5 +101,8 @@ class InferenceConfig(ScenarioConfig):
             )
             self.generate_kwargs["max_new_tokens"] = self.generate_kwargs["min_new_tokens"]
 
+        # Mamba-SSM-Repo backend specific options
+        self.generate_kwargs["max_length"] = self.generate_kwargs["max_new_tokens"] + self.input_shapes["sequence_length"]
+
         if self.energy and is_rocm_system():
             raise ValueError("Energy measurement through codecarbon is not yet available on ROCm-powered devices.")

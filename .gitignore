@@ -182,3 +182,7 @@ prefill_codecarbon.json
 external_repos/
 .DS_Store
 outputs/
+
+
+runs/
+runs*

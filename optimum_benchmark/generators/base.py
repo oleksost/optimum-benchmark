@@ -10,10 +10,11 @@ LOGGER = logging.getLogger("generators")
 
 
 class BaseGenerator(ABC):
-    def __init__(self, shapes: Dict[str, int], with_labels: bool):
+    def __init__(self, shapes: Dict[str, int], with_labels: bool, **kwargs):
         self.shapes = shapes
         self.with_labels = with_labels
-
+        self.model_type = kwargs.get("model_type", None)
+        
     def assert_not_missing_shapes(self, required_shapes: List[str]):
         for shape in required_shapes:
             assert self.shapes.get(shape, None) is not None, (

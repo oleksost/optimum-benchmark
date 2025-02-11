@@ -21,7 +21,7 @@ class InputGenerator:
         if model_type in MODEL_TYPE_TO_GENERATORS:
             self.generator = MODEL_TYPE_TO_GENERATORS[model_type](shapes=all_shapes, with_labels=False)
         elif task in TASKS_TO_GENERATORS:
-            self.generator = TASKS_TO_GENERATORS[task](shapes=all_shapes, with_labels=False)
+            self.generator = TASKS_TO_GENERATORS[task](shapes=all_shapes, with_labels=False, model_type=model_type)
         else:
             raise NotImplementedError(
                 f"Task {task} is not supported for input generation. "

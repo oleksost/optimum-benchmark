@@ -11,12 +11,20 @@ from transformers import (
     AwqConfig,
     BitsAndBytesConfig,
     GPTQConfig,
-    TorchAoConfig,
     Trainer,
     TrainerCallback,
     TrainerState,
     TrainingArguments,
 )
+
+TO_TORCH_DTYPE = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
+
+# recent version of transformers is needed fro TorchAoConfig, but some models requore older version. E.g. hymba needs transformers==4.44.2 due to the bug https://github.com/OpenBMB/MiniCPM-o/issues/722
+try:
+    from transformers import TorchAoConfig
+except ImportError:
+    pass
+
 
 from ...import_utils import is_deepspeed_available, is_torch_distributed_available, is_zentorch_available
 from ..base import Backend
@@ -102,12 +110,31 @@ class PyTorchBackend(Backend[PyTorchConfig]):
             )
         else:
             self.logger.info("\t+ Loading Transformers model")
-            self.pretrained_model = self.automodel_loader.from_pretrained(
-                pretrained_model_name_or_path=self.config.model, **self.config.model_kwargs, **self.automodel_kwargs
-            )
+            try:
+                self.pretrained_model = self.automodel_loader.from_pretrained(
+                    pretrained_model_name_or_path=self.config.model, **self.config.model_kwargs, **self.automodel_kwargs
+                )
+            except TypeError as e:
+                # using this to load MambaLMHeadModel for mamba2 and mamba. This is needed in order to load the model in the same way as in the mamba_ssm repo.
+                # This is a workaround for the fact that otherwise the model loaded from hugginface is not the same as the one in the mamba_ssm repo.
+                # THe from_pretrained in the mamba_ssm repo accepts pretrained_model_name, not pretrained_model_name_or_path.
+                
+                if "dtype" in self.config.model_kwargs:
+                    # this is here to work with the mamba_ssm_repo backend, which expects dtype to be a torch dtype
+                    dtype = self.config.model_kwargs.pop("dtype")
+                    self.config.model_kwargs["dtype"] = TO_TORCH_DTYPE[dtype]
+                self.pretrained_model = self.automodel_loader.from_pretrained(
+                    pretrained_model_name=self.config.model, **self.config.model_kwargs, **self.automodel_kwargs
+                )
+            except Exception as e:
+                self.logger.error(f"Error loading model: {e}")
+                raise e
             if self.config.device != "cpu":
                 self.logger.info(f"\t+ Moving Transformers model to device: {self.config.device}")
                 self.pretrained_model = self.pretrained_model.to(self.config.device)
+        
+        model_params = sum([p.numel() for p in self.pretrained_model.parameters()])
+        self.logger.info(f"\t+ Loading model with {model_params} parameters")
 
     def load_transformers_model_with_no_weights(self) -> None:
         original_model, self.config.model = self.config.model, self.no_weights_model
@@ -124,15 +151,25 @@ class PyTorchBackend(Backend[PyTorchConfig]):
         elif self.config.device_map is None and not self.is_quantized:
             with init_on_device(device=torch.device(self.config.device), include_buffers=True):
                 self.logger.info("\t+ Loading Transformers model using device context manager for fast initialization")
-                self.pretrained_model = self.automodel_loader.from_pretrained(
-                    pretrained_model_name_or_path=self.no_weights_model,
-                    **self.config.model_kwargs,
-                    **self.automodel_kwargs,
-                )
+                try:
+                    self.pretrained_model = self.automodel_loader.from_pretrained(
+                        pretrained_model_name_or_path=self.no_weights_model,
+                        **self.config.model_kwargs,
+                        **self.automodel_kwargs,
+                    )
+                except TypeError as e:
+                    self.pretrained_model = self.automodel_loader.from_pretrained(
+                        pretrained_model_name=self.no_weights_model,
+                        **self.config.model_kwargs,
+                        **self.automodel_kwargs,
+                    )
+                except Exception as e:
+                    raise e
         else:
             with fast_weights_init():
                 self.load_transformers_model_from_pretrained()
-
+        model_params = sum([p.numel() for p in self.pretrained_model.parameters()])
+        self.logger.info(f"\t+ Loading model with {model_params} parameters")
         self.config.model = original_model
 
     def load_transformers_model(self):
@@ -261,6 +298,19 @@ class PyTorchBackend(Backend[PyTorchConfig]):
         self.no_weights_model = os.path.join(self.tmpdir.name, "no_weights_model")
         self.logger.info("\t+ Creating no weights model directory")
         os.makedirs(self.no_weights_model, exist_ok=True)
+
+        if os.path.isdir(self.config.model):  # If model path is a local directory
+            # Link all Python files from source directory
+            for file in os.listdir(self.config.model):
+                if file.endswith('.py'):
+                    src = os.path.join(self.config.model, file)
+                    dst = os.path.join(self.no_weights_model, file)
+                    self.logger.info(f"\t+ Creating symlink for {file} in no weights model directory")
+                    if os.path.exists(dst):  # Remove existing link if it exists
+                        os.remove(dst)
+                    os.symlink(src, dst)
+
+        
         self.logger.info("\t+ Creating no weights model state dict")
         state_dict = torch.nn.Linear(1, 1).state_dict()
 

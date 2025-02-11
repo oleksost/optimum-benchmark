@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
-
+import torch
 from ...import_utils import torch_version
 from ...system_utils import is_rocm_system
 from ..config import BackendConfig
@@ -10,8 +10,6 @@ AMP_DTYPES = ["bfloat16", "float16"]
 TORCH_DTYPES = ["bfloat16", "float16", "float32", "auto"]
 
 QUANTIZATION_CONFIGS = {"bnb": {"llm_int8_threshold": 0.0}, "gptq": {}, "awq": {}, "torchao": {}}
-
-
 @dataclass
 class PyTorchConfig(BackendConfig):
     name: str = "pytorch"

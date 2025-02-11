@@ -1,0 +1,28 @@
+defaults:
+  - benchmark
+  - scenario: inference
+  # - launcher: process
+  - backend: pytorch
+  - _base_
+  - _self_
+
+name: cuda_pytorch_llama3.2-3B
+
+# launcher:
+#   device_isolation: true
+#   device_isolation_action: warn
+
+backend:
+  device: cuda
+  device_ids: 0
+  no_weights: true
+  torch_dtype: float16
+  model: meta-llama/Llama-3.2-3B
+  model_kwargs:
+    trust_remote_code: true
+    use_cache: True
+
+scenario:
+  input_shapes:
+    batch_size: 8
+    sequence_length: 256

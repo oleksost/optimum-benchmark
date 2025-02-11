@@ -6,6 +6,21 @@ import huggingface_hub
 
 from .import_utils import is_diffusers_available, is_torch_available, is_transformers_available
 
+MODELTYPE_TO_MODEL_CLASS = {}
+try:
+    # if we want to use models from mamba_ssm repo, we need to use this classs
+    # hf implementation of ssms is a weird, e.g. for mamba2-2.7b it loads an 8b model, mamba-2.8b it laods a 159M model
+    from mamba_ssm.models.mixer_seq_simple import MambaLMHeadModel
+    MODELTYPE_TO_MODEL_CLASS["mamba_ssm_repo"]= MambaLMHeadModel
+except ImportError:
+    pass
+
+CUSTOM_MODELS_2_TASK = {
+    "HymbaForCausalLM": "text-generation",
+    "MambaLMHeadModel": "text-generation",
+}
+
+
 TASKS_TO_AUTO_MODEL_CLASS_NAMES = {
     # text processing
     "feature-extraction": "AutoModel",
@@ -257,7 +272,10 @@ def infer_task_from_model_name_or_path(
         transformers_config = get_repo_config(
             model_name_or_path, "config.json", token=token, revision=revision, cache_dir=cache_dir
         )
-        target_class_name = transformers_config["architectures"][0]
+        try:
+            target_class_name = transformers_config["architectures"][0]
+        except KeyError:
+            target_class_name = "MambaLMHeadModel"
 
         for task_name, model_mapping in TASKS_TO_MODEL_TYPES_TO_MODEL_CLASS_NAMES.items():
             for _, model_class_name in model_mapping.items():
@@ -266,9 +284,11 @@ def infer_task_from_model_name_or_path(
                     break
             if inferred_task_name is not None:
                 break
-
         if inferred_task_name is None:
-            raise KeyError(f"Could not find the proper task name for target class name {target_class_name}.")
+            if target_class_name in CUSTOM_MODELS_2_TASK:
+                inferred_task_name = CUSTOM_MODELS_2_TASK[target_class_name]
+            else:
+                raise KeyError(f"Could not find the proper task name for target class name {target_class_name}.")
 
     elif library_name == "diffusers":
         diffusers_config = get_repo_config(
