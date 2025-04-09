@@ -19,6 +19,50 @@ from transformers import (
 
 TO_TORCH_DTYPE = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
 
+def filter_kwargs_for_model(func):
+    '''
+    This is not needed with my local version of mamba_ssm
+    '''
+    def wrapper(self, inputs, kwargs):
+        model_name = self.config.model
+        mamba_kwargs=(
+            'input_ids',
+            'model',
+            'max_length',
+            'top_k',
+            'top_p',
+            'min_p',
+            'temperature',
+            'repetition_penalty',
+            'eos_token_id',
+            'teacher_outputs',
+            'vocab_size',
+            'cg',
+            'enable_timing',
+            'output_scores',
+            'streamer',
+            'return_dict_in_generate',
+            'logits_processor',
+        )
+        # Need to remove soem kwargs for some models using generate from mamba_ssm repo
+        kwargs_to_keep = {
+            'cartesia-ai/Llamba-1B': mamba_kwargs,  
+            'cartesia-ai/Llamba-8B': mamba_kwargs,  
+            'state-spaces/mamba2-2.7b': mamba_kwargs,  
+        }
+        new_kwargs = {}
+        # Filter kwargs based on model name
+        if model_name in kwargs_to_keep:
+            for kwarg in kwargs.keys():
+                if kwarg in kwargs_to_keep[model_name]:
+                    new_kwargs[kwarg] = kwargs[kwarg]
+        else:
+            new_kwargs = kwargs
+        
+        return func(self, inputs, new_kwargs)
+    
+    return wrapper
+
 # recent version of transformers is needed fro TorchAoConfig, but some models requore older version. E.g. hymba needs transformers==4.44.2 due to the bug https://github.com/OpenBMB/MiniCPM-o/issues/722
 try:
     from transformers import TorchAoConfig
@@ -480,10 +524,12 @@ class PyTorchBackend(Backend[PyTorchConfig]):
 
         return inputs
 
+    # @filter_kwargs_for_model
     @torch.inference_mode()
     def forward(self, inputs: Dict[str, Any], kwargs: Dict[str, Any]) -> OrderedDict:
         return self.pretrained_model.forward(**inputs, **kwargs)
-
+    
+    # @filter_kwargs_for_model
     @torch.inference_mode()
     def prefill(self, inputs: Dict[str, Any], kwargs: Dict[str, Any]) -> OrderedDict:
         assert kwargs.get("max_new_tokens") == kwargs.get("min_new_tokens") == 1, (
@@ -491,6 +537,7 @@ class PyTorchBackend(Backend[PyTorchConfig]):
         )
         return self.pretrained_model.generate(**inputs, **kwargs)
 
+    # @filter_kwargs_for_model
     @torch.inference_mode()
     def generate(self, inputs: Dict[str, Any], kwargs: Dict[str, Any]) -> OrderedDict:
         return self.pretrained_model.generate(**inputs, **kwargs)

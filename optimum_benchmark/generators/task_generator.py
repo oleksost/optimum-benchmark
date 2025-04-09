@@ -157,7 +157,7 @@ class TextGenerationGenerator(TextGenerator):
     def __call__(self):
         dummy = {}
         dummy["input_ids"] = self.input_ids()
-        if "mamba" not in self.model_type:
+        if not any(x in self.model_type for x in ["mamba", "llamba"]):
             dummy["attention_mask"] = self.attention_mask()
 
         if self.with_labels:

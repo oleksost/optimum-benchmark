@@ -15,11 +15,34 @@ try:
 except ImportError:
     pass
 
+try:
+    from cartesia_pytorch.Llamba.llamba import LlambaLMHeadModel
+    MODELTYPE_TO_MODEL_CLASS["llamba"]= LlambaLMHeadModel
+except ImportError:
+    pass
+
+
+CUSTOM_MODEL_2_TOKENIZER = {
+    "cartesia-ai/Llamba-1B": "meta-llama/Llama-3.2-1B",
+    "cartesia-ai/Llamba-8B": "meta-llama/Llama-3.1-8B",
+}
+
+def get_llamba_config(model: str) -> "LlambaConfig":
+    from cartesia_pytorch.Llamba.llamba import LlambaConfig
+    config_dict, kwargs = LlambaConfig.get_config_dict(model)
+    return LlambaConfig(**config_dict, **kwargs)
+
+CUSTOM_MODEL_2_PRETRAINED_CONFIG = {
+    "cartesia-ai/Llamba-1B": get_llamba_config,
+    "cartesia-ai/Llamba-8B": get_llamba_config,
+}
+
+
 CUSTOM_MODELS_2_TASK = {
     "HymbaForCausalLM": "text-generation",
     "MambaLMHeadModel": "text-generation",
+    "LlambaLMHeadModel": "text-generation",
 }
-
 
 TASKS_TO_AUTO_MODEL_CLASS_NAMES = {
     # text processing

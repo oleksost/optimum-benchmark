@@ -19,8 +19,8 @@ from transformers import (
     SpecialTokensMixin,
 )
 
-from ..task_utils import TASKS_TO_AUTO_MODEL_CLASS_NAMES, map_from_synonym_task, MODELTYPE_TO_MODEL_CLASS
 
+from ..task_utils import TASKS_TO_AUTO_MODEL_CLASS_NAMES, map_from_synonym_task, MODELTYPE_TO_MODEL_CLASS, CUSTOM_MODEL_2_PRETRAINED_CONFIG, CUSTOM_MODEL_2_TOKENIZER
 
 def get_transformers_auto_model_class_for_task(task: str, model_type: Optional[str] = None) -> Type["AutoModel"]:
     task = map_from_synonym_task(task)
@@ -50,8 +50,13 @@ PretrainedProcessor = Union["FeatureExtractionMixin", "ImageProcessingMixin", "S
 
 def get_transformers_pretrained_config(model: str, **kwargs) -> "PretrainedConfig":
     # sometimes contains information about the model's input shapes that are not available in the config
-    return AutoConfig.from_pretrained(model, **kwargs)
-
+    try:
+        return AutoConfig.from_pretrained(model, **kwargs)
+    except Exception:
+        if model in CUSTOM_MODEL_2_PRETRAINED_CONFIG:
+            return CUSTOM_MODEL_2_PRETRAINED_CONFIG[model](model)
+        else:
+            raise ValueError(f"Model {model} not supported")
 
 def get_transformers_generation_config(model: str, **kwargs) -> Optional["GenerationConfig"]:
     try:
@@ -75,6 +80,8 @@ def get_transformers_pretrained_processor(model: str, **kwargs) -> Optional["Pre
                 try:
                     return AutoTokenizer.from_pretrained(model, **kwargs)
                 except Exception:
+                    if model in CUSTOM_MODEL_2_TOKENIZER:
+                        return  AutoTokenizer.from_pretrained(CUSTOM_MODEL_2_TOKENIZER[model])
                     return None
 
 

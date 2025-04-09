@@ -18,31 +18,31 @@ if __name__ == "__main__":
         latency=True,
         memory=True,
         input_shapes={"sequence_length": 200, "batch_size": 2},
-        # generate_kwargs={
-        #     "top_p": 0.9,
-        #     "top_k": 1,
-        #     "cg": True,
-        #     "temperature": 0.7,
-        #     "repetition_penalty": 1.2,
-        #     "max_new_tokens": 200,
-        #     "min_new_tokens": 200,
-        # },
+        generate_kwargs={
+            "top_p": 0.9,
+            "top_k": 1,
+            "cg": True,
+            "temperature": 0.7,
+            "repetition_penalty": 1.2,
+            "max_new_tokens": 200,
+            "min_new_tokens": 200,
+        },
     )
-    backend_config = PyTorchConfig(model="gpt2", device="cuda", device_ids="0", no_weights=True)
-    # backend_config = PyTorchConfig(
-    #     model="state-spaces/mamba-2.8b",  # "nvidia/Hymba-1.5B-Base",
-    #     library="transformers",
-    #     device="cuda",
-    #     # torch_dtype="bfloat16",
-    #     model_type="mamba_ssm_repo",
-    #     device_ids="0",
-    #     no_weights=False,
-    #     model_kwargs={
-    #         "dtype": "bfloat16",
-    #         # "trust_remote_code": True,
-    #         # "use_cache": True,
-    #     },
-    # )
+    # backend_config = PyTorchConfig(model="gpt2", device="cuda", device_ids="0", no_weights=True)
+    backend_config = PyTorchConfig(
+        model="cartesia-ai/Llamba-8B",  # "nvidia/Hymba-1.5B-Base",
+        library="transformers",
+        device="cuda",
+        # torch_dtype="bfloat16",
+        model_type="llamba",
+        device_ids="0",
+        no_weights=False,
+        model_kwargs={
+            # "dtype": "bfloat16",
+            # "trust_remote_code": True,
+            # "use_cache": True,
+        },
+    )
 
     # backend_config = PyTorchConfig(model="meta-llama/Llama-3.2-3B",
     #                                library="transformers", device="cuda", torch_dtype="bfloat16",
